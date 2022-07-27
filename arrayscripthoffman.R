@@ -9,10 +9,10 @@ rds_dir <- paste0(home_dir,'/Networks/rds')
 data_gen_file <- paste0(home_dir,'/data_gen.R')
 
 ### Setup (Hoffman)
-source(paste0(home_dir,'/hoffmanNbhdArray/helperfunctions.R'))
+source(paste0(home_dir,'/HoffmanNbhdArray/helperfunctions.R'))
 array_num <- as.numeric(Sys.getenv("SGE_TASK_ID"))
 
-source(paste0(home_dir,'/hoffmanNbhdArray/arraykernel.R'))
+source(paste0(home_dir,'/HoffmanNbhdArray/arraykernel.R'))
 
 ### Timing conclusion
 end <- Sys.time()
