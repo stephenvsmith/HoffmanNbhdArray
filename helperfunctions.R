@@ -26,7 +26,7 @@ get_network_DAG <- function(net){
   true_cpdag <- amat(network_cpdag) # Adjacency matrix of the true CPDAG
   
   setwd(current_wd) # Return to original working directory
-
+  
   return(list(
     "net"=net,
     "p"=p,
@@ -63,7 +63,7 @@ simulation_data_creation <- function(){
   } else {
     Sys.sleep(60)
   }
- setwd("..") # Return to the original directory
+  setwd("..") # Return to the original directory
 }
 
 # Check whether or not simulations have been created so they do not have to be created again
@@ -76,7 +76,7 @@ check_sims_created <- function(n){
     sims_not_created <- TRUE
   }
   return(sims_not_created)
-
+  
 }
 
 sims_text_output <- function(){
@@ -125,7 +125,7 @@ check_targets_defined_get_targets <- function(net_info){
     targets <- readRDS(paste0("targets_",net,".rds"))
     cat("Targets for",net,"obtained from file.\n")
   }
-
+  
   return(targets)
 }
 
@@ -172,15 +172,15 @@ run_global_pc <- function(df){
   time_diff <- list()
   lmax_list <- list()
   num_tests <- list()
-
+  
   largest_possible_sepset <- 5
   pc_test_file <- paste0("pc_",array_num,"_tests.txt")
   sink(file = pc_test_file)
   start <- Sys.time()
   pc.fit <- as(pc(suffStat = list(C = cor(df), n = n),
-                       indepTest = gaussCItest, ## indep.test: partial correlations
-                       alpha=alpha, labels = network_info$node_names,
-                       verbose = TRUE,m.max=largest_possible_sepset),"amat")
+                  indepTest = gaussCItest, ## indep.test: partial correlations
+                  alpha=alpha, labels = network_info$node_names,
+                  verbose = TRUE,m.max=largest_possible_sepset),"amat")
   end <- Sys.time()
   sink(file = NULL)
   diff <- end - start
@@ -257,14 +257,14 @@ run_local_fci <- function(t,df,num,results_pc,algo){
   results_pc$lmax[["Local FCI"]] <- lmax
   true_dag <- network_info$true_dag
   start <- Sys.time()
-
+  
   localfci_result <- localfci(data=df,
-                                  targets=t,
-                                  lmax=lmax,
-                                  tol=alpha,
-                                  mb_tol=mb_alpha,
-                                  method=algo,
-                                  verbose = FALSE)
+                              targets=t,
+                              lmax=lmax,
+                              tol=alpha,
+                              mb_tol=mb_alpha,
+                              method=algo,
+                              verbose = FALSE)
   end <- Sys.time()
   diff <- end - start
   units(diff) <- "mins"
@@ -277,7 +277,6 @@ run_local_fci <- function(t,df,num,results_pc,algo){
 run_local_pc <- function(t,df,num,results_pc,algo){
   val_lmax <- results_pc$lmax$PC
   lmax <- max(1,val_lmax)
-  results_pc$lmax[["Local PC"]] <- lmax
   true_dag <- network_info$true_dag
   start <- Sys.time()
   localpc_result <- localpc(data=df,
@@ -290,10 +289,9 @@ run_local_pc <- function(t,df,num,results_pc,algo){
   end <- Sys.time()
   diff <- end - start
   units(diff) <- "mins"
-  results_pc$time_diff[["Local PC"]] <- diff
-  results_pc$num_tests[["Local PC"]] <- localpc_result$NumTests
-  
-  results <- neighborhood_results_pc(t,localpc_result,results_pc,num)
+  localpc_result$time_diff <- diff
+  localpc_result$lmax<- lmax
+  results <- neighborhood_results_pc(t,localpc_result,num)
   
   return(results)
 }
@@ -322,21 +320,24 @@ neighborhood_results <- function(t,localfci_result,pc_results,num){
     true_neighborhood_graph <- as.matrix(true_neighborhood_graph,nrow=1,ncol=1)
   }
   results <- all_metrics(localfci_mat,
-                         true_neighborhood_graph,
-                         pc_mat,
-                         sapply(t,function(t) {which(nbhd==t)-1}),verbose = FALSE) # Need to check out the sapply here
+                        true_neighborhood_graph,
+                        sapply(t,function(tg) {which(nbhd==tg)-1}),
+                        algo="lfci",ref="sub_cpdag",verbose = FALSE) 
+  results_pc <- all_metrics(pc_mat,
+                            true_neighborhood_graph,
+                            sapply(t,function(tg) {which(nbhd==tg)-1}),
+                            algo = "pc",ref = "sub_cpdag",verbose = FALSE)
   nbhd_metrics <- neighborhood_metrics(true_neighborhood_graph)
   mb_metrics <- mbRecovery(network_info$cpdag,localfci_result$referenceDAG,t)
   mb_time <- getTotalMBTime(localfci_result$mbList)
-
-  results <- cbind(nbhd_metrics,results)
+  results <- cbind(nbhd_metrics,results,results_pc)
   results <- results %>% 
     mutate(pc_num_tests=pc_results$num_tests[["PC"]],
-           fci_num_tests=pc_results$num_tests[["Local FCI"]],
+           lfci_num_tests=pc_results$num_tests[["Local FCI"]],
            pc_time=pc_results$time_diff[["PC"]],
-           fci_time=pc_results$time_diff[["Local FCI"]]) %>%
-    mutate(lmax_pc = pc_results$lmax$PC,
-           lmax_fci=pc_results$lmax[["Local FCI"]]) %>% 
+           lfci_time=pc_results$time_diff[["Local FCI"]]) %>%
+    mutate(pc_lmax = pc_results$lmax$PC,
+           lfci_lmax=pc_results$lmax[["Local FCI"]]) %>% 
     mutate(sim_number=array_num,
            alpha=alpha,
            mb_alpha=mb_alpha,
@@ -352,19 +353,16 @@ neighborhood_results <- function(t,localfci_result,pc_results,num){
            totalSkeletonTime=localfci_result$totalSkeletonTime,
            targetSkeletonTimes=paste(localfci_result$targetSkeletonTimes,collapse = ","),
            totalcpptime=localfci_result$totalTime,
-           nodes=paste(localfci_result$Nodes,collapse = ",")
-           )
-
+           nodes=paste(localfci_result$Nodes,collapse = ","),
+           true_nodes=paste(nbhd,collapse = ",")
+    )
+  
   results <- cbind(results,data.frame(as.list(mbRecovery(network_info$cpdag,
                                                          localfci_result$referenceDAG,
                                                          t))))
-
-  results <- cbind(results,interNeighborhoodEdgeMetrics(localfci_result$amat,
-                                                        network_info$true_dag,
-                                                        t))
-
+  
   # saveRDS(results,file = paste0("results_df",num,".rds"))
-
+  
   # capture.output(results %>% select(size,num_edges,contains("pc")),
   #                file = paste0("results_pc",num,".txt"))
   # capture.output(results %>% select(size,num_edges,contains("fci")),
@@ -378,7 +376,7 @@ neighborhood_results <- function(t,localfci_result,pc_results,num){
   # saveRDS(localfci_result$data_cov,paste0("dataCov",num,".rds"))
   
   # saveRDS(mb_metrics,paste0("mbMetrics",num,".rds"))
-
+  
   
   # Testing Diagnostics
   
@@ -397,7 +395,7 @@ neighborhood_results <- function(t,localfci_result,pc_results,num){
   return(results)
 }
 
-neighborhood_results_pc <- function(t,localpc_result,pc_results,num){
+neighborhood_results_pc <- function(t,localpc_result,num){
   nbhd <- as.vector(sapply(t,function(targ){
     check_neighbors_retrieval(network_info$p,network_info$node_names,network_info$true_dag,targ-1)+1
   }))
@@ -406,34 +404,28 @@ neighborhood_results_pc <- function(t,localpc_result,pc_results,num){
   # Zoom in on estimated and true DAGs (only the target and first-order neighbors)
   nodes_zoom <- network_info$node_names[nbhd]
   true_neighborhood_graph <- network_info$cpdag[nbhd,nbhd] # CPDAG is Ground Truth
-  pc_mat <- matrix(pc_results$pc,nrow = network_info$p)[nbhd,nbhd]
   localpc_mat <- localpc_result$amat[nbhd,nbhd]
   # Compare results
   if (length(nbhd)==1){
-    pc_mat <- as.matrix(pc_mat,nrow=1,ncol=1)
     localpc_mat <- as.matrix(localpc_mat,nrow=1,ncol=1)
     true_neighborhood_graph <- as.matrix(true_neighborhood_graph,nrow=1,ncol=1)
   }
-  
+
   results <- all_metrics(localpc_mat,
                          true_neighborhood_graph,
-                         pc_mat,
-                         sapply(t,function(t) {which(nbhd==t)-1}),verbose = FALSE) # Need to check out the sapply here
-  names(results) <- sub("^fci_","lpc_",names(results))
+                         sapply(t,function(tg) {which(nbhd==tg)-1}),
+                         algo = "lpc",ref = "sub_cpdag",verbose = FALSE) # Need to check out the sapply here
   results <- results %>%
-    select(starts_with("lpc")) %>% 
-    mutate(lpc_num_tests=pc_results$num_tests[["Local PC"]],
-           lpc_time=pc_results$time_diff[["Local PC"]]) %>%
-    mutate(lmax_lpc=pc_results$lmax[["Local PC"]]) %>% 
+    mutate(lpc_num_tests=localpc_result$NumTests,
+           lpc_time=localpc_result$time_diff) %>%
+    mutate(lpc_lmax=localpc_result$lmax) %>% 
     mutate(trial_num=num,
            targets=paste(t,collapse = ",")) %>% 
-    mutate(targetSkeletonTimes_lpc=paste(localpc_result$targetSkeletonTimes,collapse = ","),
-           totalcpptime_lpc=localpc_result$totalTime,
-           nodes_lpc=paste(localpc_result$Nodes,collapse = ",")
+    mutate(targetSkeletonTimes=paste(localpc_result$targetSkeletonTimes,collapse = ","),
+           totalcpptime=localpc_result$totalTime,
+           nodes=paste(localpc_result$Nodes,collapse = ",")
     )
-  results <- cbind(results,interNeighborhoodEdgeMetrics(localpc_result$amat,
-                                                        network_info$true_dag,
-                                                        t))
+
   return(results)
 }
 
