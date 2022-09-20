@@ -3,8 +3,10 @@
 ##########################################################################
 
 source(data_gen_file)
-num_trials <- 5
+num_trials <- 3
 max_targets <- 4
+num_cores <- max(parallel::detectCores()-2,4)
+#num_cores <- 1
 
 data.grid <- data.frame(network = "asia",
                         data.type = "continuous",
@@ -81,7 +83,7 @@ results_list <- lapply(1:num_trials,function(num){
                               results_pc,
                               algo,
                               curr_dir,
-                              mc.preschedule = FALSE,mc.cores = 1)
+                              mc.preschedule = FALSE,mc.cores = num_cores)
   
   results_lpc_df <- mclapply(targets,
                              run_pc_target,
@@ -90,7 +92,7 @@ results_list <- lapply(1:num_trials,function(num){
                              results_pc,
                              algo,
                              curr_dir,
-                             mc.preschedule = FALSE,mc.cores = 1)
+                             mc.preschedule = FALSE,mc.cores = num_cores)
 
   results_final_df_lfci <- data.frame(do.call(rbind,results_lfci_df))
   results_final_df_lpc <- data.frame(do.call(rbind,results_lpc_df))
@@ -113,5 +115,7 @@ saveRDS(results_iteration,paste0("results_",array_num,".rds"))
 for (i in 1:num_trials){
   unlink(paste0("results_",array_num,"_",i,".rds"))
 }
+cat(array_num,file = "completed_sims.txt",append = TRUE)
+cat("\n",file = "completed_sims.txt",append = TRUE)
 
 

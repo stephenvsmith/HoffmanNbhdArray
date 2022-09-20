@@ -130,7 +130,7 @@ check_targets_defined_get_targets <- function(net_info){
 }
 
 get_targets <- function(p){
-  max_targets_per_category <- 25
+  max_targets_per_category <- 15
   if (p<25){
     max_targets_per_category <- p
   }
@@ -319,28 +319,34 @@ neighborhood_results <- function(t,localfci_result,pc_results,num){
     localfci_mat <- as.matrix(localfci_mat,nrow=1,ncol=1)
     true_neighborhood_graph <- as.matrix(true_neighborhood_graph,nrow=1,ncol=1)
   }
-  results <- all_metrics(localfci_mat,
+  results <- allMetrics(localfci_mat,
                         true_neighborhood_graph,
                         sapply(t,function(tg) {which(nbhd==tg)-1}),
                         algo="lfci",ref="sub_cpdag",verbose = FALSE) 
-  results_pc <- all_metrics(pc_mat,
-                            true_neighborhood_graph,
-                            sapply(t,function(tg) {which(nbhd==tg)-1}),
-                            algo = "pc",ref = "sub_cpdag",verbose = FALSE)
-  nbhd_metrics <- neighborhood_metrics(true_neighborhood_graph)
+  results_pc <- allMetrics(pc_mat,
+                           true_neighborhood_graph,
+                           sapply(t,function(tg) {which(nbhd==tg)-1}),
+                           algo = "pc",ref = "sub_cpdag",verbose = FALSE)
+  nbhd_metrics <- getNeighborhoodMetrics(true_neighborhood_graph)
   mb_metrics <- mbRecovery(network_info$cpdag,localfci_result$referenceDAG,t)
+  mb_metrics_add <- mbRecoveryMetrics(network_info$cpdag,localfci_result$referenceDAG,t)
   mb_time <- getTotalMBTime(localfci_result$mbList)
-  results <- cbind(nbhd_metrics,results,results_pc)
+  mb_tests <- getTotalMBTests(localfci_result$mbList)
+  rule_usage <- t(data.frame(localfci_result$RulesUsed))
+  dimnames(rule_usage) <- list(NULL,paste0("rule",0:10))
+  results <- cbind(nbhd_metrics,results,rule_usage,
+                   results_pc,mb_metrics,mb_metrics_add)
   results <- results %>% 
     mutate(pc_num_tests=pc_results$num_tests[["PC"]],
            lfci_num_tests=pc_results$num_tests[["Local FCI"]],
            pc_time=pc_results$time_diff[["PC"]],
            lfci_time=pc_results$time_diff[["Local FCI"]]) %>%
     mutate(pc_lmax = pc_results$lmax$PC,
-           lfci_lmax=pc_results$lmax[["Local FCI"]]) %>% 
+           lfci_lmax=pc_results$lmax[["Local FCI"]]) %>%
     mutate(sim_number=array_num,
            alpha=alpha,
            mb_alpha=mb_alpha,
+           algo=algo,
            net=net,
            n=n,
            ub=ub,
@@ -348,18 +354,16 @@ neighborhood_results <- function(t,localfci_result,pc_results,num){
            trial_num=num,
            num_targets=length(t),
            targets=paste(t,collapse = ","),
-           p=network_info$p) %>% 
+           p=network_info$p,
+           net_edges=sum(network_info$true_dag)) %>% 
     mutate(totalMBEstTime=mb_time,
+           totalMBTests=mb_tests,
            totalSkeletonTime=localfci_result$totalSkeletonTime,
            targetSkeletonTimes=paste(localfci_result$targetSkeletonTimes,collapse = ","),
            totalcpptime=localfci_result$totalTime,
            nodes=paste(localfci_result$Nodes,collapse = ","),
            true_nodes=paste(nbhd,collapse = ",")
     )
-  
-  results <- cbind(results,data.frame(as.list(mbRecovery(network_info$cpdag,
-                                                         localfci_result$referenceDAG,
-                                                         t))))
   
   # saveRDS(results,file = paste0("results_df",num,".rds"))
   
@@ -410,8 +414,8 @@ neighborhood_results_pc <- function(t,localpc_result,num){
     localpc_mat <- as.matrix(localpc_mat,nrow=1,ncol=1)
     true_neighborhood_graph <- as.matrix(true_neighborhood_graph,nrow=1,ncol=1)
   }
-
-  results <- all_metrics(localpc_mat,
+  
+  results <- allMetrics(localpc_mat,
                          true_neighborhood_graph,
                          sapply(t,function(tg) {which(nbhd==tg)-1}),
                          algo = "lpc",ref = "sub_cpdag",verbose = FALSE) # Need to check out the sapply here
@@ -425,7 +429,7 @@ neighborhood_results_pc <- function(t,localpc_result,num){
            totalcpptime=localpc_result$totalTime,
            nodes=paste(localpc_result$Nodes,collapse = ",")
     )
-
+  
   return(results)
 }
 
