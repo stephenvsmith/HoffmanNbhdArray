@@ -7,6 +7,7 @@ num_trials <- 3
 max_targets <- 4
 num_cores <- max(parallel::detectCores()-2,4)
 #num_cores <- 1
+cat("We are using",num_cores,"core(s).\n\n")
 
 data.grid <- data.frame(network = "asia",
                         data.type = "continuous",
@@ -24,6 +25,13 @@ data.grid <- data.frame(network = "asia",
 
 go_to_dir(result_dir)
 sim_vals <- read.csv("sim_vals.csv",stringsAsFactors = FALSE)[,-1]
+completed_sims <- read.table("completed_sims.txt")
+completed_sims <- unlist(completed_sims)
+names(completed_sims) <- NULL
+completed_sims <- sort(completed_sims)
+
+remaining_sims <- setdiff(seq(nrow(sim_vals)),completed_sims)
+array_num <- remaining_sims[array_num]
 
 alpha <- sim_vals$alpha[array_num]
 mb_alpha <- sim_vals$mb_alpha[array_num]
