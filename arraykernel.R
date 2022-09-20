@@ -5,7 +5,7 @@
 source(data_gen_file)
 num_trials <- 3
 max_targets <- 4
-num_cores <- max(parallel::detectCores()-2,4)
+num_cores <- min(parallel::detectCores()-2,4)
 #num_cores <- 1
 cat("We are using",num_cores,"core(s).\n\n")
 
@@ -31,7 +31,7 @@ names(completed_sims) <- NULL
 completed_sims <- sort(completed_sims)
 
 remaining_sims <- setdiff(seq(nrow(sim_vals)),completed_sims)
-array_num <- max(array_num,length(remaining_sims))
+array_num <- min(array_num,length(remaining_sims))
 array_num <- remaining_sims[array_num]
 
 alpha <- sim_vals$alpha[array_num]
