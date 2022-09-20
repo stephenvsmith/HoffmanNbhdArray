@@ -33,6 +33,7 @@ completed_sims <- sort(completed_sims)
 remaining_sims <- setdiff(seq(nrow(sim_vals)),completed_sims)
 array_num <- min(array_num,length(remaining_sims))
 array_num <- remaining_sims[array_num]
+cat("Array Number (Updated):",array_num,"\n\n")
 
 alpha <- sim_vals$alpha[array_num]
 mb_alpha <- sim_vals$mb_alpha[array_num]
