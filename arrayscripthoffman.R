@@ -11,6 +11,7 @@ data_gen_file <- paste0(home_dir,'/data_gen.R')
 ### Setup (Hoffman)
 source(paste0(home_dir,'/HoffmanNbhdArray/helperfunctions.R'))
 array_num <- as.numeric(Sys.getenv("SGE_TASK_ID"))
+setwd(scratch_dir)
 cat("Array Number (System):",array_num,"\n\n")
 source(paste0(home_dir,'/HoffmanNbhdArray/arraykernel.R'))
 

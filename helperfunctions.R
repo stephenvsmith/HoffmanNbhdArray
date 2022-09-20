@@ -436,6 +436,8 @@ neighborhood_results_pc <- function(t,localpc_result,num){
 # General Functions -------------------------------------------------------
 
 go_to_dir <- function(file){
+  cat("Current dir:\n",list.dirs(),"\n\n")
+  cat("Objective dir:\n",list.dirs(),"\n\n")
   if (!dir.exists(file)){
     dir.create(file)
   }
