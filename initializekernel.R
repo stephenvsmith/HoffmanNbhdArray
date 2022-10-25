@@ -5,7 +5,7 @@
 set.seed(555)
 
 # Download the newest version of the Local FCI package
-devtools::install_github("stephenvsmith/LocalFCI") # ,quiet=TRUE
+devtools::install_github("stephenvsmith/LocalFCI",update=FALSE) # ,quiet=TRUE
 
 # library(tidyverse)
 # net_size <- tibble(

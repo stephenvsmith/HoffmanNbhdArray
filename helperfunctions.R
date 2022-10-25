@@ -357,6 +357,7 @@ neighborhood_results <- function(t,localfci_result,pc_results,num){
            p=network_info$p,
            net_edges=sum(network_info$true_dag)) %>% 
     mutate(totalMBEstTime=mb_time,
+           totalMBEstTimeInclusive=localfci_result$mbEstTime,
            totalMBTests=mb_tests,
            totalSkeletonTime=localfci_result$totalSkeletonTime,
            targetSkeletonTimes=paste(localfci_result$targetSkeletonTimes,collapse = ","),
@@ -364,7 +365,6 @@ neighborhood_results <- function(t,localfci_result,pc_results,num){
            nodes=paste(localfci_result$Nodes,collapse = ","),
            true_nodes=paste(nbhd,collapse = ",")
     )
-  
   # saveRDS(results,file = paste0("results_df",num,".rds"))
   
   # capture.output(results %>% select(size,num_edges,contains("pc")),
@@ -436,8 +436,8 @@ neighborhood_results_pc <- function(t,localpc_result,num){
 # General Functions -------------------------------------------------------
 
 go_to_dir <- function(file){
-  cat("Current dir:\n",list.dirs(),"\n\n")
-  cat("Objective dir:\n",list.dirs(),"\n\n")
+  # cat("Current dir:\n",list.dirs(),"\n\n")
+  # cat("Objective dir:\n",list.dirs(),"\n\n")
   if (!dir.exists(file)){
     dir.create(file)
   }

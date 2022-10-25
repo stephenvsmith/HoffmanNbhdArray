@@ -26,15 +26,20 @@ data.grid <- data.frame(network = "asia",
 go_to_dir(result_dir)
 
 sim_vals <- read.csv("sim_vals.csv",stringsAsFactors = FALSE)[,-1]
-completed_sims <- read.table("completed_sims.txt")
-completed_sims <- unlist(completed_sims)
-names(completed_sims) <- NULL
-completed_sims <- sort(completed_sims)
-remaining_sims <- setdiff(seq(nrow(sim_vals)),completed_sims)
-ind <- which.min(abs(remaining_sims-array_num))
-# array_num <- min(array_num,length(remaining_sims))
-array_num <- remaining_sims[ind]
-cat("Array Number (Updated):",array_num,"\n\n")
+if (file.exists("completed_sims.txt")){
+  completed_sims <- read.table("completed_sims.txt")
+  completed_sims <- unlist(completed_sims)
+  names(completed_sims) <- NULL
+  completed_sims <- sort(completed_sims)
+  remaining_sims <- setdiff(seq(nrow(sim_vals)),completed_sims)
+  ind <- which.min(abs(remaining_sims-array_num))
+  # array_num <- min(array_num,length(remaining_sims))
+  array_num <- remaining_sims[ind]
+  cat("Array Number (Updated):",array_num,"\n\n")
+} else {
+  cat("Array Number:",array_num,"\n\n")
+}
+
 alpha <- sim_vals$alpha[array_num]
 mb_alpha <- sim_vals$mb_alpha[array_num]
 net <- sim_vals$net[array_num]
