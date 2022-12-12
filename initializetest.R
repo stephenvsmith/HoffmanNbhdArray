@@ -1,6 +1,6 @@
 ### For Testing
-#home_dir <- '/home/stephen/'
-home_dir <- '/Users/stephensmith/'
+home_dir <- '/home/stephen/'
+#home_dir <- '/Users/stephensmith/'
 scratch_dir <- home_dir
 data_gen_file <- paste0(home_dir,'Dropbox/Academics/Research/Code/Scripts/data_gen.R')
 result_dir <- paste0(home_dir,'Desktop/','ResultsFullSample-',format(Sys.Date(),"%m-%y"))
