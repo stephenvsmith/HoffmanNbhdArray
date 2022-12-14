@@ -22,7 +22,7 @@ get_network_DAG <- function(net){
   
   true_dag <- amat(network) # Get the adjacency matrix of the true DAG
   
-  network_cpdag <- cpdag(network) # Get the CPDAG of the true DAG
+  network_cpdag <- cpdag(network) # Get the CPDAG of the true DAG (bnlearn)
   true_cpdag <- amat(network_cpdag) # Adjacency matrix of the true CPDAG
   
   setwd(current_wd) # Return to original working directory
@@ -43,7 +43,7 @@ get_network_DAG <- function(net){
 simulation_data_creation <- function(){
   # Check to see if the data has been generated already
   go_to_dir("data")
-  sims_not_created <- check_sims_created(n)
+  sims_not_created <- check_sims_created()
   # Generate Data
   if (sims_not_created){
     sims_text_output()
@@ -52,22 +52,16 @@ simulation_data_creation <- function(){
                               array_num=array_num,
                               verbose=FALSE,
                               path.start=home_dir)
-    # dir.create(paste0(net,"_",array_num))
-    # data_files <- list.files(paste0(net,"; n = ",n,"; c = 0"))
-    # sapply(data_files,function(f){
-    #   file.copy(paste0(net,"; n = ",n,"; c = 0/",f),
-    #             paste0(net,"_",array_num))
-    # })
+    
     cat("finished",file = paste0(net,"_",array_num,"/marker.txt"))
-    #unlink(paste0(net,"; n = ",n,"; c = 0"),recursive = TRUE)
   } else {
-    Sys.sleep(60)
+    Sys.sleep(3)
   }
   setwd("..") # Return to the original directory
 }
 
 # Check whether or not simulations have been created so they do not have to be created again
-check_sims_created <- function(n){
+check_sims_created <- function(){
   sim_file <- paste0(net,"_",array_num)
   if (dir.exists(sim_file)){
     files <- list.files(sim_file) # Get the list of files in this directory\
@@ -134,6 +128,7 @@ get_targets <- function(p){
   if (p<max_targets_per_category){
     max_targets_per_category <- p
   }
+  # Generate a list of matrices containing targets sets of various sizes
   targets <- lapply(1:max_targets,function(num){
     if (p<200){
       target_options <- combn(1:p,num)
@@ -146,10 +141,13 @@ get_targets <- function(p){
       return(targets)
     }
   })
+  # Create final list containing all combinations of targets
   final_target_list <- list()
-  final_target_list <- c(final_target_list,targets[[1]]) # Add individual targets
+  # Add individual targets first
+  final_target_list <- c(final_target_list,targets[[1]]) 
   offset <- length(final_target_list)
   j <- 1
+  # Add remaining sets of targets
   for (i in 2:max_targets){
     while (j < ncol(targets[[i]])){
       final_target_list[[offset+j]]<-targets[[i]][,j]
@@ -166,6 +164,7 @@ get_targets <- function(p){
 # Global PC -----------------------------------------------------
 
 # Run global PC 
+# TODO: Add functionality to save and load since this can take a while
 run_global_pc <- function(df){
   
   # Lists to store results
@@ -203,9 +202,12 @@ run_global_pc <- function(df){
 
 # Get the maximum size of separating sets used in PC algorithm
 get_lmax <- function(file){
+  # Read the file with PC algorithm output
   pc_file <- read_file(file = file)
-  
+  # Only identify lines with tests, which will include a part including the
+  # separating set
   sep_sets <- unlist(str_extract_all(pc_file,'S= .* :'))
+  # Count the number of nodes in the separating set from each test
   counts <- sapply(sep_sets,function(s){
     res <- str_count(s,"[0-9]+")
   })
@@ -216,13 +218,16 @@ get_lmax <- function(file){
       counts <- 0
     }
   }
-  
+  # Return the maximum separating set size observed in the file
   return(max(counts))
 }
 
 get_pc_test_num <- function(file){
+  # Read the PC algorithm output file
   pc_file <- read_file(file = file)
+  # Each p-value recorded in the file represents a test
   tests <- unlist(str_extract_all(pc_file,'pval = [0-9]+'))
+  # Return the number of p-values observed
   return(length(tests))
 }
 
@@ -230,7 +235,7 @@ get_pc_test_num <- function(file){
 # Local FCI ---------------------------------------------------------------
 
 run_fci_target <- function(t,df,num,results_pc,algo,curr_dir){
-  output_text(t,num,algo)
+  output_text(t,num,algo,"lfci")
   setwd(curr_dir)
   # vars <- create_target_directory(t) 
   # Run local FCI
@@ -240,7 +245,7 @@ run_fci_target <- function(t,df,num,results_pc,algo,curr_dir){
 }
 
 run_pc_target <- function(t,df,num,results_pc,algo,curr_dir){
-  output_text(t,num,algo)
+  output_text(t,num,algo,"lpc")
   setwd(curr_dir)
   # vars <- create_target_directory(t) 
   # Run local PC
@@ -252,12 +257,13 @@ run_pc_target <- function(t,df,num,results_pc,algo,curr_dir){
 # Local FCI Helpers -------------------------------------------------------
 
 run_local_fci <- function(t,df,num,results_pc,algo){
+  # Set initial values for lmax and start timer
   val_lmax <- results_pc$lmax$PC
   lmax <- max(1,val_lmax)
   results_pc$lmax[["Local FCI"]] <- lmax
   true_dag <- network_info$true_dag
   start <- Sys.time()
-  
+  # Run local FCI
   localfci_result <- localfci(data=df,
                               targets=t,
                               lmax=lmax,
@@ -266,8 +272,9 @@ run_local_fci <- function(t,df,num,results_pc,algo){
                               method=algo,
                               verbose = FALSE)
   end <- Sys.time()
+  # Record values
   diff <- end - start
-  units(diff) <- "mins"
+  units(diff) <- "secs"
   results_pc$time_diff[["Local FCI"]] <- diff
   results_pc$num_tests[["Local FCI"]] <- localfci_result$NumTests
   results <- neighborhood_results(t,localfci_result,results_pc,num)
@@ -275,10 +282,12 @@ run_local_fci <- function(t,df,num,results_pc,algo){
 }
 
 run_local_pc <- function(t,df,num,results_pc,algo){
+  # Set initial values for max. sep. set size and start timer
   val_lmax <- results_pc$lmax$PC
   lmax <- max(1,val_lmax)
   true_dag <- network_info$true_dag
   start <- Sys.time()
+  # Run local PC
   localpc_result <- localpc(data=df,
                             targets=t,
                             lmax=lmax,
@@ -288,7 +297,7 @@ run_local_pc <- function(t,df,num,results_pc,algo){
                             verbose = FALSE)
   end <- Sys.time()
   diff <- end - start
-  units(diff) <- "mins"
+  units(diff) <- "secs"
   localpc_result$time_diff <- diff
   localpc_result$lmax<- lmax
   results <- neighborhood_results_pc(t,localpc_result,num)
@@ -301,41 +310,100 @@ create_target_directory <- function(t){
   return()
 }
 
-# Compile all results about the simulation
+# Compile all results about the simulation for local FCI
 neighborhood_results <- function(t,localfci_result,pc_results,num){
+  # Gather all the neighborhood nodes (true)
   nbhd <- as.vector(sapply(t,function(targ){
     check_neighbors_retrieval(network_info$p,network_info$node_names,network_info$true_dag,targ-1)+1
   }))
   if (is.list(nbhd)) nbhd <- unlist(nbhd)
   nbhd <- sort(unique(c(t,nbhd)))
   # Zoom in on estimated and true DAGs (only the target and first-order neighbors)
-  nodes_zoom <- network_info$node_names[nbhd]
-  pc_mat <- matrix(pc_results$pc,nrow = network_info$p)[nbhd,nbhd]
-  true_neighborhood_graph <- network_info$cpdag[nbhd,nbhd] # CPDAG is Ground Truth
-  localfci_mat <- localfci_result$amat[nbhd,nbhd]
-  # Compare results
+  nodes_zoom_narrow <- network_info$node_names[nbhd]
+  pc_mat_narrow <- matrix(pc_results$pc,nrow = network_info$p)[nbhd,nbhd]
+  true_neighborhood_graph_narrow <- network_info$cpdag[nbhd,nbhd] # subgraph of CPDAG is Ground Truth
+  localfci_mat_narrow <- localfci_result$amat[nbhd,nbhd]
   if (length(nbhd)==1){
-    pc_mat <- as.matrix(pc_mat,nrow=1,ncol=1)
-    localfci_mat <- as.matrix(localfci_mat,nrow=1,ncol=1)
-    true_neighborhood_graph <- as.matrix(true_neighborhood_graph,nrow=1,ncol=1)
+    pc_mat_narrow <- as.matrix(pc_mat,nrow=1,ncol=1)
+    localfci_mat_narrow <- as.matrix(localfci_mat,nrow=1,ncol=1)
+    true_neighborhood_graph_narrow <- as.matrix(true_neighborhood_graph,nrow=1,ncol=1)
   }
-  results <- allMetrics(localfci_mat,
-                        true_neighborhood_graph,
-                        sapply(t,function(tg) {which(nbhd==tg)-1}),
-                        algo="lfci",ref="sub_cpdag",verbose = FALSE) 
-  results_pc <- allMetrics(pc_mat,
-                           true_neighborhood_graph,
-                           sapply(t,function(tg) {which(nbhd==tg)-1}),
-                           algo = "pc",ref = "sub_cpdag",verbose = FALSE)
-  nbhd_metrics <- getNeighborhoodMetrics(true_neighborhood_graph)
+  
+  # Zoom in on the union of the estimated nodes to be included and the true nodes
+  nbhd_broad <- union(nbhd,localfci_result$Nodes)
+  nodes_zoom_broad <- network_info$node_names[nbhd_broad]
+  pc_mat_broad <- matrix(pc_results$pc,nrow = network_info$p)[nbhd_broad,nbhd_broad]
+  true_neighborhood_graph_broad <- network_info$cpdag[nbhd_broad,nbhd_broad] # subgraph of CPDAG is Ground Truth
+  localfci_mat_broad <- localfci_result$amat[nbhd_broad,nbhd_broad]
+  if (length(nbhd)==1){
+    pc_mat_broad <- as.matrix(pc_mat,nrow=1,ncol=1)
+    localfci_mat_broad <- as.matrix(localfci_mat,nrow=1,ncol=1)
+    true_neighborhood_graph_broad <- as.matrix(true_neighborhood_graph,nrow=1,ncol=1)
+  }
+  
+  # TODO: We need to add this step to the semi-sample version
+  # Ensure that we are not leaving any nodes out
+  # nodes_lfci <- as.numeric(which(localfci_result$amat!=0,arr.ind = TRUE))
+  # nodes_lfci <- unique(nodes_lfci)
+  # if (length(setdiff(nodes_lfci,nbhd))>0){
+  #   # We need to check what's wrong with our neighbor identification
+  #   warning("There are additional nodes in the estimated local FCI graph that aren't being considered")
+  # }
+  
+  # Compare results
+  
+  # Returns the following:
+  # Skeleton FP, FN, TP
+  # V-Structure FP, FN, TP
+  # PRA FP, FN, TP, Potential (Undirected edge in at least one of the graphs)
+  # Ancestors Correct, Missing, Missing Orientation, Reversed Orientation, Falsely Oriented Edge, Falsely added connection
+  # Overall F1 Score
+  
+  # Get these results for local FCI
+  results_narrow <- allMetrics(localfci_mat_narrow,
+                               true_neighborhood_graph_narrow,
+                               sapply(t,function(tg) {which(nbhd==tg)-1}),
+                               algo="lfci",which_nodes = "narrow",verbose = FALSE) %>% 
+    select(contains("skel"),contains("_v_"),contains("F1"))
+  results_broad <- allMetrics(localfci_mat_broad,
+                              true_neighborhood_graph_broad,
+                              sapply(t,function(tg) {which(nbhd_broad==tg)-1}),
+                              algo="lfci",which_nodes = "broad",verbose = FALSE) %>% 
+    select(contains("skel"),contains("_v_"),contains("pra"),contains("ancestor"))
+  # Get these results for the global PC
+  results_pc_narrow <- allMetrics(pc_mat_narrow,
+                                  true_neighborhood_graph_narrow,
+                                  sapply(t,function(tg) {which(nbhd==tg)-1}),
+                                  algo="pc",which_nodes = "narrow",verbose = FALSE) %>% 
+    select(contains("skel"),contains("_v_"),contains("F1"))
+  results_pc_broad <- allMetrics(pc_mat_broad,
+                                 true_neighborhood_graph_broad,
+                                 sapply(t,function(tg) {which(nbhd_broad==tg)-1}),
+                                 algo="pc",which_nodes = "broad",verbose = FALSE) %>% 
+    select(contains("skel"),contains("_v_"),contains("pra"),contains("ancestor"))
+  results <- cbind(results_narrow,results_broad,results_pc_narrow,results_pc_broad)
+  # (metrics.cpp) Get the number of nodes and the number of edges in the graphs we are comparing
+  nbhd_metrics <- getNeighborhoodMetrics(true_neighborhood_graph_narrow)
+  # (mbEst.R) Markov Blanket Recovery TP, FN, FP
   mb_metrics <- mbRecovery(network_info$cpdag,localfci_result$referenceDAG,t)
+  # MB children FN, TP; MB parents FN, TP; MB spouses FN, TP; MB Total FP
   mb_metrics_add <- mbRecoveryMetrics(network_info$cpdag,localfci_result$referenceDAG,t)
+  # Time and Tests given by MXM function
   mb_time <- getTotalMBTime(localfci_result$mbList)
   mb_tests <- getTotalMBTests(localfci_result$mbList)
+  # Statistics for the amount of times each FCI rule was used
   rule_usage <- t(data.frame(localfci_result$RulesUsed))
   dimnames(rule_usage) <- list(NULL,paste0("rule",0:10))
+  
+  # Begin creating the final results dataframe
+  # Start w/ basic nbhd information, allMetrics results, rule usage, allMetrics for global PC,
+  # All Markov Blanket accuracy metrics
   results <- cbind(nbhd_metrics,results,rule_usage,
-                   results_pc,mb_metrics,mb_metrics_add)
+                   mb_metrics,mb_metrics_add)
+  # Add values for number of tests and timing (everything should be in seconds),
+  # Maximum size of separating set, simulation setting values, targets, trial number,
+  # Network information, timing and testing for MB estimation, timing breakdown for steps
+  # TODO: Make sure all timing things are in seconds
   results <- results %>% 
     mutate(pc_num_tests=pc_results$num_tests[["PC"]],
            lfci_num_tests=pc_results$num_tests[["Local FCI"]],
@@ -365,36 +433,6 @@ neighborhood_results <- function(t,localfci_result,pc_results,num){
            nodes=paste(localfci_result$Nodes,collapse = ","),
            true_nodes=paste(nbhd,collapse = ",")
     )
-  # saveRDS(results,file = paste0("results_df",num,".rds"))
-  
-  # capture.output(results %>% select(size,num_edges,contains("pc")),
-  #                file = paste0("results_pc",num,".txt"))
-  # capture.output(results %>% select(size,num_edges,contains("fci")),
-  #                file = paste0("results_fci",num,".txt"))
-  
-  # write.table(localfci_result$amat,paste0("estAmat",num,".txt"))
-  # write.table(localfci_result$referenceDag,"refDAG.txt")
-  # saveRDS(localfci_result$S,paste0("SepSet",num,".rds"))
-  # saveRDS(localfci_result$mbList,paste0("mbList",num,".rds"))
-  # saveRDS(localfci_result$data_means,paste0("dataMeans",num,".rds"))
-  # saveRDS(localfci_result$data_cov,paste0("dataCov",num,".rds"))
-  
-  # saveRDS(mb_metrics,paste0("mbMetrics",num,".rds"))
-  
-  
-  # Testing Diagnostics
-  
-  # capture.output(results %>% select(size,num_edges,contains("pc")),
-  #                file = paste0("results_pc",num,".txt"))
-  # capture.output(results %>% select(size,num_edges,contains("fci")),
-  #                file = paste0("results_fci",num,".txt"))
-  
-  # write.table(localfci_result$amat,paste0("estAmat",num,".txt"))
-  # write.table(localfci_result$referenceDag,"refDAG.txt")
-  # saveRDS(localfci_result$S,paste0("SepSet",num,".rds"))
-  # saveRDS(localfci_result$mbList,paste0("mbList",num,".rds"))
-  # saveRDS(localfci_result$data_means,paste0("dataMeans",num,".rds"))
-  # saveRDS(localfci_result$data_cov,paste0("dataCov",num,".rds"))
   
   return(results)
 }
@@ -406,19 +444,34 @@ neighborhood_results_pc <- function(t,localpc_result,num){
   if (is.list(nbhd)) nbhd <- unlist(nbhd)
   nbhd <- sort(unique(c(t,nbhd)))
   # Zoom in on estimated and true DAGs (only the target and first-order neighbors)
-  nodes_zoom <- network_info$node_names[nbhd]
-  true_neighborhood_graph <- network_info$cpdag[nbhd,nbhd] # CPDAG is Ground Truth
-  localpc_mat <- localpc_result$amat[nbhd,nbhd]
-  # Compare results
+  nodes_zoom_narrow <- network_info$node_names[nbhd]
+  true_neighborhood_graph_narrow <- network_info$cpdag[nbhd,nbhd] # subgraph of CPDAG is Ground Truth
+  localpc_mat_narrow <- localpc_result$amat[nbhd,nbhd]
   if (length(nbhd)==1){
-    localpc_mat <- as.matrix(localpc_mat,nrow=1,ncol=1)
-    true_neighborhood_graph <- as.matrix(true_neighborhood_graph,nrow=1,ncol=1)
+    localpc_mat_narrow <- as.matrix(localfci_mat,nrow=1,ncol=1)
+    true_neighborhood_graph_narrow <- as.matrix(true_neighborhood_graph,nrow=1,ncol=1)
   }
   
-  results <- allMetrics(localpc_mat,
-                         true_neighborhood_graph,
-                         sapply(t,function(tg) {which(nbhd==tg)-1}),
-                         algo = "lpc",ref = "sub_cpdag",verbose = FALSE) # Need to check out the sapply here
+  # Zoom in on the union of the estimated nodes to be included and the true nodes
+  nbhd_broad <- union(nbhd,localpc_result$Nodes)
+  nodes_zoom_broad <- network_info$node_names[nbhd_broad]
+  true_neighborhood_graph_broad <- network_info$cpdag[nbhd_broad,nbhd_broad] # subgraph of CPDAG is Ground Truth
+  localpc_mat_broad <- localpc_result$amat[nbhd_broad,nbhd_broad]
+  if (length(nbhd)==1){
+    localpc_mat_broad <- as.matrix(localpc_mat,nrow=1,ncol=1)
+    true_neighborhood_graph_broad <- as.matrix(true_neighborhood_graph,nrow=1,ncol=1)
+  }
+  results_narrow <- allMetrics(localpc_mat_narrow,
+                               true_neighborhood_graph_narrow,
+                               sapply(t,function(tg) {which(nbhd==tg)-1}),
+                               algo="lpc",which_nodes = "narrow",verbose = FALSE) %>% 
+    select(contains("skel"),contains("_v_"),contains("F1"))
+  results_broad <- allMetrics(localpc_mat_broad,
+                              true_neighborhood_graph_broad,
+                              sapply(t,function(tg) {which(nbhd_broad==tg)-1}),
+                              algo="lpc",which_nodes = "broad",verbose = FALSE) %>% 
+    select(contains("skel"),contains("_v_"),contains("pra"),contains("ancestor"))
+  results <- cbind(results_narrow,results_broad)
   results <- results %>%
     mutate(lpc_num_tests=localpc_result$NumTests,
            lpc_time=localpc_result$time_diff) %>%
@@ -494,12 +547,13 @@ check_completion <- function(dir){
   }
 }
 
-output_text <- function(t,num,algo){
-  q1 <- format(paste("Tolerances:",paste0(alpha,",",mb_alpha)),width = 28,justify = "centre")
+output_text <- function(t,num,algo,method){
+  q1 <- format(paste("Tols.:",paste0(alpha,",",mb_alpha)),width = 21,justify = "centre")
   q2 <- format(paste("Net:",net),width = 25,justify = "centre")
-  q3 <- format(paste("Sample Size:",data.grid$n.obs),width = 18,justify = "centre")
-  q4 <- format(paste("MB Algorithm:",algo),width = 18,justify = "centre")
-  q5 <- format(paste("Targets:",paste(t,collapse=",")),width = 23,justify = "left")
-  q6 <- format(paste("Dataset:",num),width = 15,justify = "centre")
-  cat(q1,"|",q2,"|",q3,"|",q4,"|",q5,"|",q6,"\n")
+  q3 <- format(paste("Sample N:",data.grid$n.obs),width = 15,justify = "centre")
+  q4 <- format(paste("Algo:",method),width = 10,justify = "centre")
+  q5 <- format(paste("MB Algo:",algo),width = 14,justify = "centre")
+  q6 <- format(paste("Targets:",paste(t,collapse=",")),width = 23,justify = "left")
+  q7 <- format(paste("Dataset:",num),width = 15,justify = "centre")
+  cat(q1,"|",q2,"|",q3,"|",q4,"|",q5,"|",q6,"|",q7,"\n")
 }

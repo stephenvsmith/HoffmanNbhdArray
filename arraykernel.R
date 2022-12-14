@@ -2,13 +2,21 @@
 # This file provides the kernel for arrayscript{test|hoffman}.R
 ##########################################################################
 
+### Simulation Setup
+
+# Load the file with functions for generating data
 source(data_gen_file)
+# Define the number of trials for each simulation setting
 num_trials <- 3
+# Define the number of targets considered for each setting
 max_targets <- 4
+# Define the number of cores used for parallel processing
 num_cores <- min(parallel::detectCores()-2,4)
 num_cores <- 1
 cat("We are using",num_cores,"core(s).\n\n")
 
+# Set up a generic data grid for simulated data
+# True values will be replace these later
 data.grid <- data.frame(network = "asia",
                         data.type = "continuous",
                         n.dat = num_trials,
@@ -24,8 +32,10 @@ data.grid <- data.frame(network = "asia",
 
 
 go_to_dir(result_dir)
-
+### Read the table containing each simulation setting
 sim_vals <- read.csv("sim_vals.csv",stringsAsFactors = FALSE)[,-1]
+
+### TODO: MODIFY THIS SO THAT WE AREN'T WORKING ON SAME SIMULATION TWICE
 if (file.exists("completed_sims.txt")){
   completed_sims <- read.table("completed_sims.txt")
   completed_sims <- unlist(completed_sims)
@@ -40,6 +50,7 @@ if (file.exists("completed_sims.txt")){
   cat("Array Number:",array_num,"\n\n")
 }
 
+### Save the settings for this simulation run
 alpha <- sim_vals$alpha[array_num]
 mb_alpha <- sim_vals$mb_alpha[array_num]
 net <- sim_vals$net[array_num]
@@ -59,7 +70,6 @@ cat("n:",n,"\n")
 cat("MB algo:",algo,"\n")
 
 # Obtain network information, including the true DAG adj. mat.
-
 network_info <- get_network_DAG(net)
 
 # Generate/Retrieve Targets
@@ -83,7 +93,7 @@ df_list <- lapply(1:num_trials,function(i) grab_data(i))
 # Keep network directory
 curr_dir <- getwd()
 
-# Get results for each trial
+# Get results for each trial if they exist
 results_list <- lapply(1:num_trials,function(num){
 
   if (file.exists(paste0("results_",array_num,"_",num,".rds"))){
@@ -92,9 +102,13 @@ results_list <- lapply(1:num_trials,function(num){
   
   # Run Global PC Algorithm
   trial_num <- num
+  cat("Running Global PC for Dataset",num,"... ")  
   results_pc <- run_global_pc(df_list[[num]])
+  time_pc <- results_pc$time_diff$PC
+  units(time_pc) <- "secs"
+  cat("completed in",as.numeric(time_pc),units(time_pc),"\n")
   
-  # Run Local FCI Algorithm
+  # Run Local FCI Algorithm for all sets of targets
   results_lfci_df <- mclapply(targets,
                               run_fci_target,
                               df=df_list[[num]],
@@ -104,6 +118,7 @@ results_list <- lapply(1:num_trials,function(num){
                               curr_dir,
                               mc.preschedule = FALSE,mc.cores = num_cores)
   
+  # Run Local FCI Algorithm for all sets of targets
   results_lpc_df <- mclapply(targets,
                              run_pc_target,
                              df=df_list[[num]],
