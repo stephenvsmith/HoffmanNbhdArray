@@ -3,7 +3,6 @@
 ##########################################################################
 
 ### Simulation Setup
-
 # Load the file with functions for generating data
 source(data_gen_file)
 # Define the number of trials for each simulation setting
@@ -36,19 +35,19 @@ go_to_dir(result_dir)
 sim_vals <- read.csv("sim_vals.csv",stringsAsFactors = FALSE)[,-1]
 
 ### TODO: MODIFY THIS SO THAT WE AREN'T WORKING ON SAME SIMULATION TWICE
-if (file.exists("completed_sims.txt")){
-  completed_sims <- read.table("completed_sims.txt")
-  completed_sims <- unlist(completed_sims)
-  names(completed_sims) <- NULL
-  completed_sims <- sort(completed_sims)
-  remaining_sims <- setdiff(seq(nrow(sim_vals)),completed_sims)
-  ind <- which.min(abs(remaining_sims-array_num))
-  # array_num <- min(array_num,length(remaining_sims))
-  array_num <- remaining_sims[ind]
-  cat("Array Number (Updated):",array_num,"\n\n")
-} else {
-  cat("Array Number:",array_num,"\n\n")
-}
+# if (file.exists("completed_sims.txt")){
+#   completed_sims <- read.table("completed_sims.txt")
+#   completed_sims <- unlist(completed_sims)
+#   names(completed_sims) <- NULL
+#   completed_sims <- sort(completed_sims)
+#   remaining_sims <- setdiff(seq(nrow(sim_vals)),completed_sims)
+#   ind <- which.min(abs(remaining_sims-array_num))
+#   # array_num <- min(array_num,length(remaining_sims))
+#   array_num <- remaining_sims[ind]
+#   cat("Array Number (Updated):",array_num,"\n\n")
+# } else {
+#   cat("Array Number:",array_num,"\n\n")
+# }
 
 ### Save the settings for this simulation run
 alpha <- sim_vals$alpha[array_num]
@@ -95,7 +94,6 @@ curr_dir <- getwd()
 
 # Get results for each trial if they exist
 results_list <- lapply(1:num_trials,function(num){
-
   if (file.exists(paste0("results_",array_num,"_",num,".rds"))){
     return(readRDS(paste0("results_",array_num,"_",num,".rds")))
   }
@@ -107,7 +105,7 @@ results_list <- lapply(1:num_trials,function(num){
   time_pc <- results_pc$time_diff$PC
   units(time_pc) <- "secs"
   cat("completed in",as.numeric(time_pc),units(time_pc),"\n")
-  
+
   # Run Local FCI Algorithm for all sets of targets
   results_lfci_df <- mclapply(targets,
                               run_fci_target,
@@ -144,11 +142,11 @@ results_list <- lapply(1:num_trials,function(num){
 
 results_iteration <- data.frame(do.call(rbind,results_list))
 saveRDS(results_iteration,paste0("results_",array_num,".rds"))
-# TODO: SAVE LOCALFCI OBJECTS AND PC OBJECTS IN CASE IT HELPS
 # Remove temporary files (if the program gets to this point)
 for (i in 1:num_trials){
   unlink(paste0("results_",array_num,"_",i,".rds"))
 }
+unlink(paste0("pc_",array_num,"_results.rds"))
 cat(array_num,file = "completed_sims.txt",append = TRUE)
 cat("\n",file = "completed_sims.txt",append = TRUE)
 

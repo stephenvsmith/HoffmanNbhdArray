@@ -40,6 +40,7 @@ get_network_DAG <- function(net){
 
 # Simulation Data Functions -----------------------------------------------
 
+# Function responsible for generating the data for the simulation setting
 simulation_data_creation <- function(){
   # Check to see if the data has been generated already
   go_to_dir("data")
@@ -73,6 +74,7 @@ check_sims_created <- function(){
   
 }
 
+# Provides a text output for which datasets are being created
 sims_text_output <- function(){
   q1 <- format(paste("Generating Datasets for",net),width = 35,justify = "left")
   q2 <- format(paste("U.B. Variance:",data.grid$high),width = 20,justify = "centre")
@@ -97,6 +99,7 @@ grab_data <- function(df_num){
   return(df)
 }
 
+# Checks whether or not the file with the data for the current setting exists
 check_file <- function(f_name){
   files <- list.files()
   i <- 0
@@ -110,6 +113,7 @@ check_file <- function(f_name){
 
 # Target functions --------------------------------------------------------
 
+# Function to obtain targets of various sizes for the network \
 check_targets_defined_get_targets <- function(net_info){
   # Determine whether or not targets have been defined
   if (!file.exists(paste0("targets_",net,".rds"))){
@@ -123,6 +127,7 @@ check_targets_defined_get_targets <- function(net_info){
   return(targets)
 }
 
+# Internal function to create the list of targets
 get_targets <- function(p){
   max_targets_per_category <- 15
   if (p<max_targets_per_category){
@@ -164,13 +169,16 @@ get_targets <- function(p){
 # Global PC -----------------------------------------------------
 
 # Run global PC 
-# TODO: Add functionality to save and load since this can take a while
 run_global_pc <- function(df){
   
   # Lists to store results
   time_diff <- list()
   lmax_list <- list()
   num_tests <- list()
+  if (file.exists(paste0("pc_",array_num,"_results.rds"))){
+    cat("We are loading PC algorithm results from a saved file")
+    return(readRDS(paste0("pc_",array_num,"_results.rds")))
+  }
   
   largest_possible_sepset <- 5
   pc_test_file <- paste0("pc_",array_num,"_tests.txt")
@@ -183,16 +191,20 @@ run_global_pc <- function(df){
   end <- Sys.time()
   sink(file = NULL)
   diff <- end - start
-  units(diff) <- "mins"
+  units(diff) <- "secs"
   time_diff$PC <- diff
   lmax_list$PC <- get_lmax(pc_test_file)
   num_tests$PC <- get_pc_test_num(pc_test_file)
   
-  return(list(
+  pc_res <- list(
     "pc"=pc.fit,
     "time_diff"=time_diff,
     "lmax"=lmax_list,
-    "num_tests"=num_tests))
+    "num_tests"=num_tests
+  )
+  saveRDS(pc_res,paste0("pc_",array_num,"_results.rds"))
+  
+  return(pc_res)
 }
 
 
@@ -277,6 +289,9 @@ run_local_fci <- function(t,df,num,results_pc,algo){
   units(diff) <- "secs"
   results_pc$time_diff[["Local FCI"]] <- diff
   results_pc$num_tests[["Local FCI"]] <- localfci_result$NumTests
+  check_anc_edge_markings(localfci_result$amat,
+                          paste0(result_dir,"/anc_edge_errors.txt"),
+                          array_num)
   results <- neighborhood_results(t,localfci_result,results_pc,num)
   return(results)
 }
@@ -317,8 +332,10 @@ neighborhood_results <- function(t,localfci_result,pc_results,num){
     check_neighbors_retrieval(network_info$p,network_info$node_names,network_info$true_dag,targ-1)+1
   }))
   if (is.list(nbhd)) nbhd <- unlist(nbhd)
+  # Add the target to the neighborhood set
   nbhd <- sort(unique(c(t,nbhd)))
-  # Zoom in on estimated and true DAGs (only the target and first-order neighbors)
+  ### First, we look at the results using only the true neighborhoods (narrow)
+  # Zoom in on estimated and true DAGs (only the targets and first-order neighbors)
   nodes_zoom_narrow <- network_info$node_names[nbhd]
   pc_mat_narrow <- matrix(pc_results$pc,nrow = network_info$p)[nbhd,nbhd]
   true_neighborhood_graph_narrow <- network_info$cpdag[nbhd,nbhd] # subgraph of CPDAG is Ground Truth
@@ -328,7 +345,8 @@ neighborhood_results <- function(t,localfci_result,pc_results,num){
     localfci_mat_narrow <- as.matrix(localfci_mat,nrow=1,ncol=1)
     true_neighborhood_graph_narrow <- as.matrix(true_neighborhood_graph,nrow=1,ncol=1)
   }
-  
+  ### Second, we consider the results on the union of the estimated neighborhood
+  ### nodes and the true nodes
   # Zoom in on the union of the estimated nodes to be included and the true nodes
   nbhd_broad <- union(nbhd,localfci_result$Nodes)
   nodes_zoom_broad <- network_info$node_names[nbhd_broad]
@@ -380,7 +398,7 @@ neighborhood_results <- function(t,localfci_result,pc_results,num){
                                  true_neighborhood_graph_broad,
                                  sapply(t,function(tg) {which(nbhd_broad==tg)-1}),
                                  algo="pc",which_nodes = "broad",verbose = FALSE) %>% 
-    select(contains("skel"),contains("_v_"),contains("pra"),contains("ancestor"))
+    select(contains("skel"),contains("_v_"),contains("pra"))
   results <- cbind(results_narrow,results_broad,results_pc_narrow,results_pc_broad)
   # (metrics.cpp) Get the number of nodes and the number of edges in the graphs we are comparing
   nbhd_metrics <- getNeighborhoodMetrics(true_neighborhood_graph_narrow)
@@ -439,9 +457,11 @@ neighborhood_results <- function(t,localfci_result,pc_results,num){
 
 neighborhood_results_pc <- function(t,localpc_result,num){
   nbhd <- as.vector(sapply(t,function(targ){
+    # Returns DAG neighbors using Rcpp function
     check_neighbors_retrieval(network_info$p,network_info$node_names,network_info$true_dag,targ-1)+1
   }))
   if (is.list(nbhd)) nbhd <- unlist(nbhd)
+  # Add the target to the neighborhood set
   nbhd <- sort(unique(c(t,nbhd)))
   # Zoom in on estimated and true DAGs (only the target and first-order neighbors)
   nodes_zoom_narrow <- network_info$node_names[nbhd]
@@ -470,7 +490,7 @@ neighborhood_results_pc <- function(t,localpc_result,num){
                               true_neighborhood_graph_broad,
                               sapply(t,function(tg) {which(nbhd_broad==tg)-1}),
                               algo="lpc",which_nodes = "broad",verbose = FALSE) %>% 
-    select(contains("skel"),contains("_v_"),contains("pra"),contains("ancestor"))
+    select(contains("skel"),contains("_v_"),contains("pra"))
   results <- cbind(results_narrow,results_broad)
   results <- results %>%
     mutate(lpc_num_tests=localpc_result$NumTests,
@@ -556,4 +576,15 @@ output_text <- function(t,num,algo,method){
   q6 <- format(paste("Targets:",paste(t,collapse=",")),width = 23,justify = "left")
   q7 <- format(paste("Dataset:",num),width = 15,justify = "centre")
   cat(q1,"|",q2,"|",q3,"|",q4,"|",q5,"|",q6,"|",q7,"\n")
+}
+
+check_anc_edge_markings <- function(G,file_name,sim_num){
+  for (i in 1:nrow(G)){
+    for (j in 1:ncol(G)){
+      if ((G[i,j] %in% c(2,3)) && (G[j,i]==1)){
+        cat("Incorrect ancestral labels for",sim_num,"\n",file = file_name)
+        return()
+      }
+    }
+  }
 }
