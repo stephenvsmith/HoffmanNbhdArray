@@ -101,7 +101,7 @@ results_list <- lapply(1:num_trials,function(num){
   # Run Global PC Algorithm
   trial_num <- num
   cat("Running Global PC for Dataset",num,"... ")  
-  results_pc <- run_global_pc(df_list[[num]])
+  results_pc <- run_global_pc(df_list[[num]],trial_num)
   time_pc <- results_pc$time_diff$PC
   units(time_pc) <- "secs"
   cat("completed in",as.numeric(time_pc),units(time_pc),"\n")

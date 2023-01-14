@@ -169,15 +169,16 @@ get_targets <- function(p){
 # Global PC -----------------------------------------------------
 
 # Run global PC 
-run_global_pc <- function(df){
+run_global_pc <- function(df,trial_num){
   
   # Lists to store results
   time_diff <- list()
   lmax_list <- list()
   num_tests <- list()
-  if (file.exists(paste0("pc_",array_num,"_results.rds"))){
+
+  if (file.exists(paste0("pc_",array_num,"_",trial_num,"_results.rds"))){
     cat("We are loading PC algorithm results from a saved file")
-    return(readRDS(paste0("pc_",array_num,"_results.rds")))
+    return(readRDS(paste0("pc_",array_num,"_",trial_num,"_results.rds")))
   }
   
   largest_possible_sepset <- 5
@@ -202,7 +203,7 @@ run_global_pc <- function(df){
     "lmax"=lmax_list,
     "num_tests"=num_tests
   )
-  saveRDS(pc_res,paste0("pc_",array_num,"_results.rds"))
+  saveRDS(pc_res,paste0("pc_",array_num,"_",trial_num,"_results.rds"))
   
   return(pc_res)
 }
@@ -341,7 +342,7 @@ neighborhood_results <- function(t,localfci_result,pc_results,num){
   true_neighborhood_graph_narrow <- network_info$cpdag[nbhd,nbhd] # subgraph of CPDAG is Ground Truth
   localfci_mat_narrow <- localfci_result$amat[nbhd,nbhd]
   if (length(nbhd)==1){
-    pc_mat_narrow <- as.matrix(pc_mat,nrow=1,ncol=1)
+    pc_mat_narrow <- as.matrix(pc_mat_narrow,nrow=1,ncol=1)
     localfci_mat_narrow <- as.matrix(localfci_mat,nrow=1,ncol=1)
     true_neighborhood_graph_narrow <- as.matrix(true_neighborhood_graph,nrow=1,ncol=1)
   }
@@ -354,7 +355,7 @@ neighborhood_results <- function(t,localfci_result,pc_results,num){
   true_neighborhood_graph_broad <- network_info$cpdag[nbhd_broad,nbhd_broad] # subgraph of CPDAG is Ground Truth
   localfci_mat_broad <- localfci_result$amat[nbhd_broad,nbhd_broad]
   if (length(nbhd)==1){
-    pc_mat_broad <- as.matrix(pc_mat,nrow=1,ncol=1)
+    pc_mat_broad <- as.matrix(pc_mat_broad,nrow=1,ncol=1)
     localfci_mat_broad <- as.matrix(localfci_mat,nrow=1,ncol=1)
     true_neighborhood_graph_broad <- as.matrix(true_neighborhood_graph,nrow=1,ncol=1)
   }
@@ -468,7 +469,7 @@ neighborhood_results_pc <- function(t,localpc_result,num){
   true_neighborhood_graph_narrow <- network_info$cpdag[nbhd,nbhd] # subgraph of CPDAG is Ground Truth
   localpc_mat_narrow <- localpc_result$amat[nbhd,nbhd]
   if (length(nbhd)==1){
-    localpc_mat_narrow <- as.matrix(localfci_mat,nrow=1,ncol=1)
+    localpc_mat_narrow <- as.matrix(localpc_mat_narrow,nrow=1,ncol=1)
     true_neighborhood_graph_narrow <- as.matrix(true_neighborhood_graph,nrow=1,ncol=1)
   }
   
@@ -478,7 +479,7 @@ neighborhood_results_pc <- function(t,localpc_result,num){
   true_neighborhood_graph_broad <- network_info$cpdag[nbhd_broad,nbhd_broad] # subgraph of CPDAG is Ground Truth
   localpc_mat_broad <- localpc_result$amat[nbhd_broad,nbhd_broad]
   if (length(nbhd)==1){
-    localpc_mat_broad <- as.matrix(localpc_mat,nrow=1,ncol=1)
+    localpc_mat_broad <- as.matrix(localpc_mat_broad,nrow=1,ncol=1)
     true_neighborhood_graph_broad <- as.matrix(true_neighborhood_graph,nrow=1,ncol=1)
   }
   results_narrow <- allMetrics(localpc_mat_narrow,
