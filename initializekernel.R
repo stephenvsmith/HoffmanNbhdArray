@@ -26,4 +26,8 @@ simulation_values <- expand.grid(alpha=alpha,mb_alpha=mb_alpha,net=net,
                                  high=high,ub=ub,n=n,algos=algos)
 
 go_to_dir(result_dir)
-write.csv(simulation_values,file = "sim_vals.csv")
+if (file.exists("incomplete.txt")){
+  cat("We are skipping making the sim_vals file")
+} else {
+  write.csv(simulation_values,file = "sim_vals.csv")
+}
