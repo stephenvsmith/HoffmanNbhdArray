@@ -129,7 +129,7 @@ check_targets_defined_get_targets <- function(net_info){
 
 # Internal function to create the list of targets
 get_targets <- function(p){
-  max_targets_per_category <- 15
+  max_targets_per_category <- 8
   if (p<max_targets_per_category){
     max_targets_per_category <- p
   }
@@ -177,7 +177,7 @@ run_global_pc <- function(df,trial_num){
   num_tests <- list()
   
   if (file.exists(paste0("pc_",array_num,"_",trial_num,"_results.rds"))){
-    cat("We are loading PC algorithm results from a saved file")
+    cat("We are loading PC algorithm results from a saved file ... ")
     return(readRDS(paste0("pc_",array_num,"_",trial_num,"_results.rds")))
   }
   
@@ -204,7 +204,7 @@ run_global_pc <- function(df,trial_num){
     "num_tests"=num_tests
   )
   saveRDS(pc_res,paste0("pc_",array_num,"_",trial_num,"_results.rds"))
-  
+
   return(pc_res)
 }
 
@@ -329,7 +329,7 @@ create_target_directory <- function(t){
 
 # Result Functions --------------------------------------------------------
 
-get_neighborhoods <- function(t,local_result){
+get_nbhds <- function(t,local_result){
   # Gather all the neighborhood nodes (true)
   nbhd <- as.vector(sapply(t,function(targ){
     check_neighbors_retrieval(network_info$p,network_info$node_names,
@@ -353,7 +353,7 @@ get_neighborhoods <- function(t,local_result){
 }
 
 # Return the matrices we need to compare for our metrics
-get_matrices <- function(nbhds,pc_results,local_result,get_pc=TRUE){
+get_ref_mats <- function(nbhds,pc_results,local_result,get_pc=TRUE){
   # Get PC matrix around narrow neighborhood
   pc_mat_narrow<-NULL
   pc_mat_broad<-NULL
@@ -374,7 +374,7 @@ get_matrices <- function(nbhds,pc_results,local_result,get_pc=TRUE){
   true_neighborhood_graph_broad <- network_info$cpdag[nbhds$broad,nbhds$broad]
   local_mat_broad <- local_result$amat[nbhds$broad,nbhds$broad]
   
-  ### Fix matrices if they are length 1
+  ### Fix matrices if only one node
   if (length(nbhds$narrow)==1){
     if(get_pc) {pc_mat_narrow <- as.matrix(pc_mat_narrow,nrow=1,ncol=1)}
     local_mat_narrow <- as.matrix(local_mat_narrow,nrow=1,ncol=1)
@@ -399,7 +399,7 @@ get_matrices <- function(nbhds,pc_results,local_result,get_pc=TRUE){
   )
 }
 
-estimation_metrics <- function(targets,graphs,nbhds,method='lfci'){
+get_result_metrics <- function(targets,graphs,nbhds,method='lfci'){
   if (method=='pc'){
     g_narrow <- graphs$pc_narrow
     g_broad <- graphs$pc_broad
@@ -439,9 +439,10 @@ estimation_metrics <- function(targets,graphs,nbhds,method='lfci'){
 # usage metrics
 additional_metrics <- function(graphs,local_result,pc_result,
                                targets,nbhds,method='lfci'){
-  # (metrics.cpp) Get the number of nodes and the number of edges in the graphs we are comparing
   if (method=='lfci') {
+    ### General information about the neighborhood (metrics.cpp)
     nbhd_metrics <- getNeighborhoodMetrics(graphs$ground_narrow)
+    ### Markov Blanket Recovery metrics
     # (mbEst.R) Markov Blanket Recovery TP, FN, FP
     mb_metrics <- mbRecovery(network_info$cpdag,local_result$referenceDAG,targets)
     # MB children FN, TP; MB parents FN, TP; MB spouses FN, TP; MB Total FP
@@ -450,11 +451,15 @@ additional_metrics <- function(graphs,local_result,pc_result,
     # Time and Tests given by MXM function
     mb_time <- getTotalMBTime(local_result$mbList)
     mb_tests <- getTotalMBTests(local_result$mbList)
-    # Statistics for the amount of times each FCI rule was used
+    
+    ### Statistics for the amount of times each FCI rule was used
     rule_usage <- t(data.frame(local_result$RulesUsed))
     dimnames(rule_usage) <- list(NULL,paste0("rule",0:10))
+    
+    ### Combine results so far
     results <- cbind(nbhd_metrics,mb_metrics,mb_metrics_add,
                      mb_time,mb_tests,rule_usage)
+    ### Add previously collected results about tests, timing, lmax, and nbhds
     results <- results %>% 
       mutate(pc_num_tests=pc_result$num_tests[["PC"]],
              lfci_num_tests=pc_result$num_tests[["Local FCI"]],
@@ -473,13 +478,13 @@ additional_metrics <- function(graphs,local_result,pc_result,
              nodes_local_est=paste(local_result$Nodes,collapse = ",")
       )
   } else {
+    ### Simplified results data for local PC
     results <- data.frame(
       lpc_time=as.numeric(local_result$time_diff),
       lpc_lmax=local_result$lmax,
       lpc_num_tests=local_result$NumTests,
       targetSkeletonTimes=paste(local_result$targetSkeletonTimes,collapse = ","),
-      totalcpptime=local_result$totalTime,
-      nodes=paste(local_result$Nodes,collapse = ",")
+      totalcpptime=local_result$totalTime
     )
     
   }
@@ -515,9 +520,9 @@ clean_modify_results <- function(results,num,t){
 # Compile all results about the simulation for local FCI
 neighborhood_results <- function(t,localfci_result,pc_results,num){
   # Obtain narrow and broad neighborhoods
-  nbhd <- get_neighborhoods(t,localfci_result)
+  nbhd <- get_nbhds(t,localfci_result)
   # Obtain narrow and broad matrices from algorithms and reference
-  mats <- get_matrices(nbhd,pc_results,localfci_result)
+  mats <- get_ref_mats(nbhd,pc_results,localfci_result)
   
   # Compare results
   # Returns the following:
@@ -526,13 +531,13 @@ neighborhood_results <- function(t,localfci_result,pc_results,num){
   # PRA FP, FN, TP, Potential (Undirected edge in at least one of the graphs)
   # Ancestors Correct, Missing, Missing Orientation, Reversed Orientation, Falsely Oriented Edge, Falsely added connection
   # Overall F1 Score
-  lfci_results <- estimation_metrics(t,mats,nbhd)
-  pc_results <- estimation_metrics(t,mats,nbhd,'pc')
+  lfci_metrics <- get_result_metrics(t,mats,nbhd)
+  pc_metrics <- get_result_metrics(t,mats,nbhd,'pc')
   
   add_results <- additional_metrics(mats,localfci_result,pc_results,t,nbhd)
   
   # Combine results
-  results <- cbind(lfci_results,pc_results,add_results)
+  results <- cbind(lfci_metrics,pc_metrics,add_results)
   results <- clean_modify_results(results,num,t)
   
   return(results)
@@ -540,11 +545,11 @@ neighborhood_results <- function(t,localfci_result,pc_results,num){
 
 neighborhood_results_pc <- function(t,localpc_result,num){
   # Obtain narrow and broad neighborhoods
-  nbhd <- get_neighborhoods(t,localpc_result)
+  nbhd <- get_nbhds(t,localpc_result)
   # Obtain narrow and broad matrices from algorithms and reference
-  mats <- get_matrices(nbhd,NULL,localpc_result,get_pc = FALSE)
+  mats <- get_ref_mats(nbhd,NULL,localpc_result,get_pc = FALSE)
   
-  lpc_results <- estimation_metrics(t,mats,nbhd,method = 'lpc')
+  lpc_results <- get_result_metrics(t,mats,nbhd,method = 'lpc')
   
   add_results <- additional_metrics(mats,localpc_result,pc_results,
                                     t,nbhd,method = 'lpc') %>% 

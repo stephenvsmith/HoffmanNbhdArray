@@ -12,11 +12,9 @@ data_gen_file <- paste0(home_dir,'/data_gen.R')
 source(paste0(home_dir,'/Sample-Hoffman-Scripts/helperfunctions.R'))
 # Obtain the value of this simulation from the system environment
 array_num <- as.numeric(Sys.getenv("SGE_TASK_ID"))
-incomplete <- read.table("incomplete.txt")[,1]
-array_num <- incomplete[array_num]
-
 setwd(scratch_dir)
-cat("Array Number (System):",array_num,"\n\n")
+# Try to prevent sims from going on top of each other
+Sys.sleep(runif(1,min = 1,max = 5))
 source(paste0(home_dir,'/Sample-Hoffman-Scripts/arraykernel.R'))
 
 ### Timing conclusion

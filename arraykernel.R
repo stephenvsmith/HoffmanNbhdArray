@@ -10,7 +10,7 @@ num_trials <- 3
 # Define the number of targets considered for each setting
 max_targets <- 4
 # Define the number of cores used for parallel processing
-num_cores <- min(parallel::detectCores()-2,4)
+#num_cores <- min(parallel::detectCores()-2,4)
 num_cores <- 1
 cat("We are using",num_cores,"core(s).\n\n")
 
@@ -33,6 +33,25 @@ data.grid <- data.frame(network = "asia",
 go_to_dir(result_dir)
 ### Read the table containing each simulation setting
 sim_vals <- read.csv("sim_vals.csv",stringsAsFactors = FALSE)[,-1]
+# Remove any completed sims
+if(file.exists("completed_sims.txt")){
+  complete <- read.table("completed_sims.txt")[,1]  
+} else {
+  complete <- c()
+}
+
+if(file.exists("in_process_sims.txt")){
+  in_process <- read.table("in_process_sims.txt")[,1]  
+} else {
+  in_process <- c()
+}
+
+incomplete <- setdiff(seq(1,nrow(sim_vals)),c(complete,in_process))
+array_num <- incomplete[min(array_num,length(incomplete))]
+
+cat("Array Number (System):",array_num,"\n\n")
+cat(array_num,file = "in_process_sims.txt",append = TRUE)
+cat("\n",file = "in_process_sims.txt",append = TRUE)
 
 ### Save the settings for this simulation run
 alpha <- sim_vals$alpha[array_num]
@@ -121,6 +140,11 @@ results_list <- lapply(1:num_trials,function(num){
                 ends_with(c("_lpc","_lfci")))
   
   saveRDS(results_final_df,paste0("results_",array_num,"_",num,".rds"))
+  if (num < num_trials){
+    cat(array_num,file = paste0("completed_",num,"_sim.txt"),append = TRUE)
+    cat("\n",file = paste0("completed_",num,"_sim.txt"),append = TRUE)
+  }
+  
   setwd(curr_dir)
   return(results_final_df)
 })
@@ -130,8 +154,11 @@ saveRDS(results_iteration,paste0("results_",array_num,".rds"))
 # Remove temporary files (if the program gets to this point)
 for (i in 1:num_trials){
   unlink(paste0("results_",array_num,"_",i,".rds"))
+  unlink(paste0("pc_",array_num,"_",i,"_results.rds"))
 }
-unlink(paste0("pc_",array_num,"_results.rds"))
+
+unlink(paste0("pc_",array_num,"_tests.txt"))
+
 cat(array_num,file = "completed_sims.txt",append = TRUE)
 cat("\n",file = "completed_sims.txt",append = TRUE)
 
