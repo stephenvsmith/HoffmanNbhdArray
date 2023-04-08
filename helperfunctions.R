@@ -483,6 +483,11 @@ additional_metrics <- function(graphs,local_result,pc_result,
       lpc_time=as.numeric(local_result$time_diff),
       lpc_lmax=local_result$lmax,
       lpc_num_tests=local_result$NumTests,
+      lpc_rule0=local_result$rules_used[1],
+      lpc_rule1=local_result$rules_used[2],
+      lpc_rule2=local_result$rules_used[3],
+      lpc_rule3=local_result$rules_used[4],
+      lpc_rule4=local_result$rules_used[5],
       targetSkeletonTimes=paste(local_result$targetSkeletonTimes,collapse = ","),
       totalcpptime=local_result$totalTime
     )
@@ -548,7 +553,7 @@ neighborhood_results_pc <- function(t,localpc_result,num){
   nbhd <- get_nbhds(t,localpc_result)
   # Obtain narrow and broad matrices from algorithms and reference
   mats <- get_ref_mats(nbhd,NULL,localpc_result,get_pc = FALSE)
-  
+
   lpc_results <- get_result_metrics(t,mats,nbhd,method = 'lpc')
   
   add_results <- additional_metrics(mats,localpc_result,pc_results,

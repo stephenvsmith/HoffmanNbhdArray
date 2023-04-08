@@ -11,7 +11,7 @@ sim_vals <- read.csv(paste0(home_dir,
                             '/Desktop/ResultsSample-',format(Sys.Date(),"%m-%y"),
                             '/sim_vals.csv'))
 array_num <- sample(1:nrow(sim_vals),1)
-
+array_num <- 1
 cat("Simulation",array_num,file = "~/Desktop/lastSim.txt")
 
 source(paste0(home_dir,'/Dropbox/Academics/Research/Code/Scripts/Sample-Hoffman-Scripts/arraykernel.R'))
