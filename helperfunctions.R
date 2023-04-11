@@ -364,15 +364,33 @@ get_ref_mats <- function(nbhds,pc_results,local_result,get_pc=TRUE){
                            nrow = network_info$p)[nbhds$broad,nbhds$broad]
   }
   
+  # Remove all ancestral edges from consideration
+  local_mat <- local_result$amat
+  n_dim <- nrow(local_mat)
+  for (i in 1:n_dim){
+    for (j in i:n_dim){
+      if (local_mat[i,j]>1){
+        if (local_mat[j,i]<=1){
+          cat("Local matrix i,j val:",local_mat[i,j],"\n")
+          cat("Local matrix j,i val:",local_mat[j,i],"\n")
+          warning("Improperly set ancestral edge from local algorithm")
+        }
+        local_mat[i,j] <- local_mat[j,i] <- 0
+      }
+    }
+  }
+  
   # Ground truth graph from narrow neighborhood
   # subgraph of CPDAG is Ground Truth
   true_neighborhood_graph_narrow <- network_info$cpdag[nbhds$narrow,nbhds$narrow] 
   # local algorithm's narrow graph
   local_mat_narrow <- local_result$amat[nbhds$narrow,nbhds$narrow]
+  local_mat_narrow_shd <- local_mat[nbhds$narrow,nbhds$narrow]
   
   ### Broad neighborhood graphs
   true_neighborhood_graph_broad <- network_info$cpdag[nbhds$broad,nbhds$broad]
   local_mat_broad <- local_result$amat[nbhds$broad,nbhds$broad]
+  local_mat_broad_shd <- local_mat[nbhds$broad,nbhds$broad]
   
   ### Fix matrices if only one node
   if (length(nbhds$narrow)==1){
@@ -394,7 +412,9 @@ get_ref_mats <- function(nbhds,pc_results,local_result,get_pc=TRUE){
       "pc_narrow"=pc_mat_narrow,
       "pc_broad"=pc_mat_broad,
       "local_narrow"=local_mat_narrow,
-      "local_broad"=local_mat_broad
+      "local_broad"=local_mat_broad,
+      "local_narrow_shd"=local_mat_narrow_shd,
+      "local_broad_shd"=local_mat_broad_shd
     )
   )
 }
@@ -414,7 +434,7 @@ get_result_metrics <- function(targets,graphs,nbhds,method='lfci'){
                                  which(nbhds$narrow==t)-1
                                }),
                                network_info$true_dag,
-                               nbhds$narrow,
+                               nbhds$narrow-1,
                                algo=method,which_nodes = "narrow",verbose = FALSE) %>% 
     select(contains("skel"),contains("_v_"),contains("F1"))
   results_broad <- allMetrics(g_broad,
@@ -423,8 +443,9 @@ get_result_metrics <- function(targets,graphs,nbhds,method='lfci'){
                                 which(nbhds$broad==t)-1
                               }),
                               network_info$true_dag,
-                              nbhds$broad,
-                              algo=method,which_nodes = "broad",verbose = FALSE) %>% 
+                              nbhds$broad-1,
+                              algo=method,which_nodes = "broad",verbose = FALSE)
+  results_broad <- results_broad %>% 
     select(contains("skel"),contains("_v_"),contains("pra"),contains("ancestor"))
   
   if (method=='pc'){
@@ -522,6 +543,23 @@ clean_modify_results <- function(results,num,t){
   return(results)
 }
 
+# TODO: Fix this 
+# Idea: remove all ancestral edges and go from there
+get_shd <- function(ref_mat,est_mat){
+  p <- nrow(ref_mat)
+  ref_g <- bnlearn::empty.graph(nodes=as.character(1:p))
+  est_g <- bnlearn::empty.graph(nodes=as.character(1:p))
+  colnames(ref_mat) <- rownames(ref_mat) <- as.character(1:p)
+  colnames(est_mat) <- rownames(est_mat) <- as.character(1:p)
+  amat(ref_g) <- ref_mat
+  amat(est_g,check.cycles=FALSE) <- est_mat
+  # if (!bnlearn::acyclic(est_g)){
+  #    
+  # }
+  shd_res <- bnlearn::shd(learned = est_g,true = ref_g)
+  return(shd_res)
+}
+
 # Compile all results about the simulation for local FCI
 neighborhood_results <- function(t,localfci_result,pc_results,num){
   # Obtain narrow and broad neighborhoods
@@ -538,6 +576,18 @@ neighborhood_results <- function(t,localfci_result,pc_results,num){
   # Overall F1 Score
   lfci_metrics <- get_result_metrics(t,mats,nbhd)
   pc_metrics <- get_result_metrics(t,mats,nbhd,'pc')
+  if (length(nbhd)>0){
+    pc_metrics$pc_narrow_shd <- get_shd(mats$ground_narrow,mats$pc_narrow)
+    pc_metrics$pc_broad_shd <- get_shd(mats$ground_broad,mats$pc_broad)
+    lfci_metrics$lfci_narrow_shd <- get_shd(mats$ground_narrow,mats$local_narrow_shd)
+    lfci_metrics$lfci_broad_shd <- get_shd(mats$ground_broad,mats$local_broad_shd)
+  } else {
+    pc_metrics$pc_narrow_shd <- 0
+    pc_metrics$pc_broad_shd <- 0
+    lfci_metrics$lfci_narrow_shd <- 0
+    lfci_metrics$lfci_broad_shd <- 0
+  }
+  
   
   add_results <- additional_metrics(mats,localfci_result,pc_results,t,nbhd)
   
@@ -555,14 +605,14 @@ neighborhood_results_pc <- function(t,localpc_result,num){
   mats <- get_ref_mats(nbhd,NULL,localpc_result,get_pc = FALSE)
 
   lpc_results <- get_result_metrics(t,mats,nbhd,method = 'lpc')
-  
+  lpc_results$lpc_narrow_shd <- get_shd(mats$ground_narrow,mats$local_narrow)
+  lpc_results$lpc_broad_shd <- get_shd(mats$ground_broad,mats$local_broad)
   add_results <- additional_metrics(mats,localpc_result,pc_results,
                                     t,nbhd,method = 'lpc') %>% 
     mutate(trial_num=num,
            targets=paste(t,collapse = ","))
   results <- cbind(lpc_results,add_results)
-  
-  
+
   return(results)
 }
 
