@@ -144,6 +144,9 @@ results_list <- lapply(1:num_trials,function(num){
     cat(array_num,file = paste0("completed_",num,"_sim.txt"),append = TRUE)
     cat("\n",file = paste0("completed_",num,"_sim.txt"),append = TRUE)
   }
+
+  unlink(paste0("lfci_",array_num,"_",num,"_","*","_results.rds"))
+  unlink(paste0("lpc_",array_num,"_",num,"_","*","_results.rds"))
   
   setwd(curr_dir)
   return(results_final_df)

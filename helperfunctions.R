@@ -182,20 +182,29 @@ run_global_pc <- function(df,trial_num){
   }
   
   largest_possible_sepset <- 5
-  pc_test_file <- paste0("pc_",array_num,"_tests.txt")
-  sink(file = pc_test_file)
+  if (!str_detect(network_info$net,"munin")){
+    pc_test_file <- paste0("pc_",array_num,"_tests.txt")
+    sink(file = pc_test_file)
+  }
   start <- Sys.time()
   pc.fit <- as(pc(suffStat = list(C = cor(df), n = n),
                   indepTest = gaussCItest, ## indep.test: partial correlations
                   alpha=alpha, labels = network_info$node_names,
                   verbose = TRUE,m.max=largest_possible_sepset),"amat")
   end <- Sys.time()
-  sink(file = NULL)
+  if (!str_detect(network_info$net,"munin")){
+    sink(file = NULL)  
+  }
+  
   diff <- end - start
   units(diff) <- "secs"
   time_diff$PC <- diff
   lmax_list$PC <- get_lmax(pc_test_file)
-  num_tests$PC <- get_pc_test_num(pc_test_file)
+  if (!str_detect(network_info$net,"munin")){
+    num_tests$PC <- get_pc_test_num(pc_test_file)
+  } else {
+    num_tests$PC <- NA
+  }
   
   pc_res <- list(
     "pc"=pc.fit,
@@ -250,20 +259,28 @@ get_pc_test_num <- function(file){
 run_fci_target <- function(t,df,num,results_pc,algo,curr_dir){
   output_text(t,num,algo,"lfci")
   setwd(curr_dir)
-  # vars <- create_target_directory(t) 
+  if (file.exists(paste0("lfci_",array_num,"_",num,"_",paste(t,collapse = "_"),"_results.rds"))){
+    cat("Downloaded\n")
+    return(readRDS(paste0("lfci_",array_num,"_",num,"_",paste(t,collapse = "_"),"_results.rds")))
+  }
+  
   # Run local FCI
   results <- run_local_fci(t,df,num,results_pc,algo)
-  
+  saveRDS(results,paste0("lfci_",array_num,"_",num,"_",paste(t,collapse = "_"),"_results.rds"))
   return(results)
 }
 
 run_pc_target <- function(t,df,num,results_pc,algo,curr_dir){
   output_text(t,num,algo,"lpc")
   setwd(curr_dir)
-  # vars <- create_target_directory(t) 
+  if (file.exists(paste0("lpc_",array_num,"_",num,"_",paste(t,collapse = "_"),"_results.rds"))){
+    cat("Downloaded\n")
+    return(readRDS(paste0("lpc_",array_num,"_",num,"_",paste(t,collapse = "_"),"_results.rds")))
+  }
   # Run local PC
   results <- run_local_pc(t,df,num,results_pc,algo)
   
+  saveRDS(results,paste0("lpc_",array_num,"_",num,"_",paste(t,collapse = "_"),"_results.rds"))
   return(results)
 }
 
