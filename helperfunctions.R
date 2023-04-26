@@ -196,13 +196,16 @@ run_global_pc <- function(df,trial_num){
                   verbose = v,m.max=largest_possible_sepset),"amat")
   end <- Sys.time()
   if (!str_detect(network_info$net,"munin")){
-    sink(file = NULL)  
+    sink(file = NULL)
+    lmax_list$PC <- get_lmax(pc_test_file)
+  } else {
+    lmax_list$PC <- 5
   }
   
   diff <- end - start
   units(diff) <- "secs"
   time_diff$PC <- diff
-  lmax_list$PC <- get_lmax(pc_test_file)
+  
   if (!str_detect(network_info$net,"munin")){
     num_tests$PC <- get_pc_test_num(pc_test_file)
   } else {
