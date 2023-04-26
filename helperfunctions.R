@@ -184,13 +184,16 @@ run_global_pc <- function(df,trial_num){
   largest_possible_sepset <- 5
   if (!str_detect(network_info$net,"munin")){
     pc_test_file <- paste0("pc_",array_num,"_tests.txt")
+    v <- TRUE
     sink(file = pc_test_file)
+  } else {
+    v <- FALSE
   }
   start <- Sys.time()
   pc.fit <- as(pc(suffStat = list(C = cor(df), n = n),
                   indepTest = gaussCItest, ## indep.test: partial correlations
                   alpha=alpha, labels = network_info$node_names,
-                  verbose = TRUE,m.max=largest_possible_sepset),"amat")
+                  verbose = v,m.max=largest_possible_sepset),"amat")
   end <- Sys.time()
   if (!str_detect(network_info$net,"munin")){
     sink(file = NULL)  
