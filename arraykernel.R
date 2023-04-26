@@ -77,6 +77,8 @@ network_info <- get_network_DAG(net)
 
 # Generate/Retrieve Targets
 targets <- check_targets_defined_get_targets(network_info)
+t_tot <- length(targets)
+targets <- targets[sort(sample(seq(t_tot),floor(t_tot*0.5)))]
 
 # Set up for simulated data and directory for context
 data.grid$network <- net
@@ -95,6 +97,9 @@ df_list <- lapply(1:num_trials,function(i) grab_data(i))
 
 # Keep network directory
 curr_dir <- getwd()
+
+# Commands for reduced run
+
 
 # Get results for each trial if they exist
 results_list <- lapply(1:num_trials,function(num){
