@@ -78,7 +78,8 @@ network_info <- get_network_DAG(net)
 # Generate/Retrieve Targets
 targets <- check_targets_defined_get_targets(network_info)
 t_tot <- length(targets)
-targets <- targets[sort(sample(seq(t_tot),floor(t_tot*0.5)))]
+set.seed(111)
+targets <- targets[sort(sample(seq(t_tot),2))]
 
 # Set up for simulated data and directory for context
 data.grid$network <- net
@@ -116,24 +117,24 @@ results_list <- lapply(1:num_trials,function(num){
   cat("completed in",as.numeric(time_pc),units(time_pc),"\n")
 
   # Run Local FCI Algorithm for all sets of targets
-  results_lfci_df <- mclapply(targets,
+  results_lfci_df <- lapply(targets,
                               run_fci_target,
                               df=df_list[[num]],
                               num,
                               results_pc,
                               algo,
-                              curr_dir,
-                              mc.preschedule = FALSE,mc.cores = num_cores)
+                              curr_dir)#,
+                              #mc.preschedule = FALSE,mc.cores = num_cores)
   
   # Run Local FCI Algorithm for all sets of targets
-  results_lpc_df <- mclapply(targets,
+  results_lpc_df <- lapply(targets,
                              run_pc_target,
                              df=df_list[[num]],
                              num,
                              results_pc,
                              algo,
-                             curr_dir,
-                             mc.preschedule = FALSE,mc.cores = num_cores)
+                             curr_dir)#,
+                             #mc.preschedule = FALSE,mc.cores = num_cores)
 
   results_final_df_lfci <- data.frame(do.call(rbind,results_lfci_df))
   results_final_df_lpc <- data.frame(do.call(rbind,results_lpc_df))

@@ -6,7 +6,7 @@ set.seed(555)
 
 # Download the newest version of the Local FCI package
 if (load_package){
-  devtools::install_github("stephenvsmith/LocalFCI",upgrade="never") # ,quiet=TRUE  
+  devtools::install_github("stephenvsmith/CML",upgrade="never") # ,quiet=TRUE  
 }
 
 
